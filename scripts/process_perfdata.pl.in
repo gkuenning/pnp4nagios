@@ -483,6 +483,13 @@ sub data2rrd {
     @ds_create = ();
     $ds_update = '';
 
+    #
+    # Old-style RRD files name each data series with numbers.  Newer
+    # ones use labels from the data.  It's expensive to figure out
+    # which (requires calling rrdinfo) so we only check once.
+    #
+    my $style = 'unknown';
+
     for my $i ( 0 .. $#data ) {
         print_log( " -- Job $i ", 3 );
         my $DS = $i + 1;
@@ -508,6 +515,9 @@ sub data2rrd {
         	$ds_update = "$data[$i]{timet}";
         }
 
+        my $clean_name = $data[$i]{name};
+        $clean_name =~ tr/a-zA-Z0-9_/_/c;
+        $clean_name = substr($clean_name, 0, 19);
         if ( $data[$i]{rrd_storage_type} eq "MULTIPLE" ) {
             print_log( "DEBUG: MULTIPLE Storage Type", 3 );
             $DS = 1;
@@ -518,8 +528,32 @@ sub data2rrd {
             $rrd_storage_type = "MULTIPLE";
             $rrdfile          = $conf{RRDPATH} . "/" . $data[$i]{hostname} . "/" . $data[$i]{servicedesc} . "_" . $data[$i]{name} . ".rrd";
 
+            if ( $style == 'unknown' ) {
+                if ( $conf{USE_RRDs} == 1 ) {
+                    my $hash = RRDs::info($rrdfile);
+                    if (exists $$hash{"ds[1].index"}) {
+                        $style = 'old';
+                    }
+                    else {
+                        $style = 'new';
+                    }
+                }
+                else {
+                    if (system("rrdinfo $rrdfile | grep 'ds\\[0\\]\\.index =' >/dev/null") == 0) {
+                        $style = 'old';
+                    }
+                    else {
+                        $style = 'new';
+                    }
+                }
+                print_log( "DEBUG: set style to $style", 3);
+            }
+
             # DS is set to 1
-            @ds_create = "DS:$DS:$data[$i]{dstype}:$data[$i]{rrd_heartbeat}:$data[$i]{rrd_min}:$data[$i]{rrd_max}";
+            if ( $style == 'old' ) {
+                $clean_name = $DS;
+            }
+            @ds_create = "DS:$clean_name:$data[$i]{dstype}:$data[$i]{rrd_heartbeat}:$data[$i]{rrd_min}:$data[$i]{rrd_max}";
             $ds_update = "$data[$i]{timet}:$data[$i]{value}";
             @rrd_state = write_rrd();
             @ds_create = ();
@@ -534,7 +568,32 @@ sub data2rrd {
             #
             $rrd_storage_type = "SINGLE";
             $rrdfile          = $conf{RRDPATH} . "/" . $data[$i]{hostname} . "/" . $data[$i]{servicedesc} . ".rrd";
-            push( @ds_create, "DS:$DS:$data[$i]{dstype}:$data[$i]{rrd_heartbeat}:$data[$i]{rrd_min}:$data[$i]{rrd_max}" );
+
+            if ( $style == 'unknown' ) {
+                if ( $conf{USE_RRDs} == 1 ) {
+                    my $hash = RRDs::info($rrdfile);
+                    if (exists $$hash{"ds[1].index"}) {
+                        $style = 'old';
+                    }
+                    else {
+                        $style = 'new';
+                    }
+                }
+                else {
+                    if (system("rrdinfo $rrdfile | grep 'ds\\[0\\]\\.index =' >/dev/null") == 0) {
+                        $style = 'old';
+                    }
+                    else {
+                        $style = 'new';
+                    }
+                }
+                print_log( "DEBUG: set style to $style", 3);
+            }
+
+            if ( $style == 'old' ) {
+                $clean_name = $DS;
+            }
+            push( @ds_create, "DS:$clean_name:$data[$i]{dstype}:$data[$i]{rrd_heartbeat}:$data[$i]{rrd_min}:$data[$i]{rrd_max}" );
             $ds_update = "$ds_update:$data[$i]{value}";
         }
 
@@ -543,7 +602,7 @@ sub data2rrd {
         write_to_template( "RRD_STORAGE_TYPE", $data[$i]{rrd_storage_type} );
         write_to_template( "RRD_HEARTBEAT",    $data[$i]{rrd_heartbeat} );
         write_to_template( "IS_MULTI",         $data[0]{multi} );
-        write_to_template( "DS",               $DS );
+        write_to_template( "DS",               $clean_name );
         write_to_template( "NAME",             $data[$i]{name} );
         write_to_template( "LABEL",            $data[$i]{label} );
         write_to_template( "UNIT",             $data[$i]{uom} );
