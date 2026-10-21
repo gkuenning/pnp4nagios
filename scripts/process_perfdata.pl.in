@@ -528,7 +528,7 @@ sub data2rrd {
             $rrd_storage_type = "MULTIPLE";
             $rrdfile          = $conf{RRDPATH} . "/" . $data[$i]{hostname} . "/" . $data[$i]{servicedesc} . "_" . $data[$i]{name} . ".rrd";
 
-            if ( $style == 'unknown' ) {
+            if ( $style eq 'unknown' ) {
                 if ( $conf{USE_RRDs} == 1 ) {
                     my $hash = RRDs::info($rrdfile);
                     if (exists $$hash{"ds[1].index"}) {
@@ -550,7 +550,7 @@ sub data2rrd {
             }
 
             # DS is set to 1
-            if ( $style == 'old' ) {
+            if ( $style eq 'old' ) {
                 $clean_name = $DS;
             }
             @ds_create = "DS:$clean_name:$data[$i]{dstype}:$data[$i]{rrd_heartbeat}:$data[$i]{rrd_min}:$data[$i]{rrd_max}";
@@ -569,7 +569,7 @@ sub data2rrd {
             $rrd_storage_type = "SINGLE";
             $rrdfile          = $conf{RRDPATH} . "/" . $data[$i]{hostname} . "/" . $data[$i]{servicedesc} . ".rrd";
 
-            if ( $style == 'unknown' ) {
+            if ( $style eq 'unknown' ) {
                 if ( $conf{USE_RRDs} == 1 ) {
                     my $hash = RRDs::info($rrdfile);
                     if (exists $$hash{"ds[1].index"}) {
@@ -590,7 +590,7 @@ sub data2rrd {
                 print_log( "DEBUG: set style to $style", 3);
             }
 
-            if ( $style == 'old' ) {
+            if ( $style eq 'old' ) {
                 $clean_name = $DS;
             }
             push( @ds_create, "DS:$clean_name:$data[$i]{dstype}:$data[$i]{rrd_heartbeat}:$data[$i]{rrd_min}:$data[$i]{rrd_max}" );
